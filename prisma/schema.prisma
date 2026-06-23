@@ -1,0 +1,795 @@
+// GoBig.cc — Complete Database Schema
+// Covers: Auth, Users, Designs, Problems, Jobs, Editorial, Payments, Moderation
+// DB: PostgreSQL (Supabase / self-hosted VPS)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// ─────────────────────────────────────────────────────────────
+// AUTH & USERS
+// ─────────────────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  DESIGNER
+  CORPORATE
+  VISITOR
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  PENDING_VERIFICATION
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  name          String?
+  role          UserRole   @default(VISITOR)
+  status        UserStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  // NextAuth relations
+  accounts Account[]
+  sessions Session[]
+
+  // Profile
+  designerProfile  DesignerProfile?
+  corporateProfile CorporateProfile?
+
+  // Activity
+  designs            Design[]
+  designForks        DesignFork[]         @relation("ForkedBy")
+  designLikes        DesignLike[]
+  designSaves        DesignSave[]
+  comments           Comment[]
+  problemSubmissions ProblemSubmission[]
+  jobApplications    JobApplication[]
+  sentMessages       Message[]            @relation("Sender")
+  receivedMessages   Message[]            @relation("Recipient")
+  notifications      Notification[]
+  following          Follow[]             @relation("Follower")
+  followers          Follow[]             @relation("Following")
+  reports            Report[]             @relation("Reporter")
+  reportedContent    Report[]             @relation("ReportedUser")
+  collaborations     DesignCollaborator[]
+  editorialArticles  EditorialArticle[]
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+}
+
+// NextAuth required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─────────────────────────────────────────────────────────────
+// PROFILES
+// ─────────────────────────────────────────────────────────────
+
+model DesignerProfile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  alias          String?  @unique
+  bio            String?  @db.Text
+  avatarUrl      String?
+  website        String?
+  country        String?
+  skills         String[] // array of skill tags
+  experience     String? // e.g. "3-5 years"
+  resumeUrl      String?
+  portfolioLinks String[]
+  socialLinks    Json? // { twitter, linkedin, instagram, dribbble }
+  creativeScore  Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([alias])
+  @@index([creativeScore])
+}
+
+model CorporateProfile {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  companyName String
+  logoUrl     String?
+  website     String?
+  industry    String?
+  description String? @db.Text
+  country     String?
+  verified    Boolean @default(false)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problems Problem[]
+  jobs     Job[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODULE A — OPEN DESIGN
+// ─────────────────────────────────────────────────────────────
+
+enum DesignCategory {
+  PRODUCT_DESIGN
+  UX_UI
+  ARCHITECTURE
+  INTERIOR_DESIGN
+  GRAPHIC_DESIGN
+  BRANDING
+  PACKAGING
+  INDUSTRIAL_DESIGN
+  FASHION_DESIGN
+  ILLUSTRATION
+  CONCEPT_ART
+  OTHER
+}
+
+enum DesignVisibility {
+  PUBLIC
+  UNLISTED
+  DRAFT
+}
+
+enum LicenseType {
+  OPEN_SOURCE
+  ROYALTY_BASED
+  COLLABORATION_ONLY
+  CUSTOM
+}
+
+enum IdentityType {
+  REAL_NAME
+  ALIAS
+}
+
+model Design {
+  id             String           @id @default(cuid())
+  title          String
+  slug           String           @unique
+  description    String?          @db.Text
+  designNotes    String?          @db.Text
+  category       DesignCategory
+  tags           String[]
+  visibility     DesignVisibility @default(DRAFT)
+  identityType   IdentityType     @default(REAL_NAME)
+  publishedAlias String? // alias name used at time of publish
+  licenseType    LicenseType      @default(OPEN_SOURCE)
+  licenseDetails Json? // royalty amounts, custom terms, etc.
+  figmaLink      String?
+  thumbnailUrl   String?
+
+  // Metrics (denormalized for performance)
+  viewCount     Int @default(0)
+  likeCount     Int @default(0)
+  saveCount     Int @default(0)
+  forkCount     Int @default(0)
+  downloadCount Int @default(0)
+  shareCount    Int @default(0)
+
+  // Versioning
+  currentVersion Int      @default(1)
+  parentDesignId String? // if this is a fork
+  parentDesign   Design?  @relation("DesignForks", fields: [parentDesignId], references: [id])
+  forks          Design[] @relation("DesignForks")
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  // Relations
+  authorId         String
+  author           User                 @relation(fields: [authorId], references: [id])
+  files            DesignFile[]
+  versions         DesignVersion[]
+  likes            DesignLike[]
+  saves            DesignSave[]
+  comments         Comment[]            @relation("DesignComments")
+  collaborators    DesignCollaborator[]
+  forkRecords      DesignFork[]         @relation("DesignForkRecords")
+  forkedFromRecord DesignFork[]         @relation("DesignForkSource")
+  reports          Report[]             @relation("ReportedDesign")
+  licensePurchases LicensePurchase[]
+
+  @@index([authorId])
+  @@index([category])
+  @@index([visibility])
+  @@index([licenseType])
+  @@index([createdAt])
+  @@index([likeCount])
+}
+
+model DesignFile {
+  id        String   @id @default(cuid())
+  designId  String
+  filename  String
+  fileUrl   String
+  fileType  String // jpg, png, svg, pdf, psd, ai, cad, zip
+  fileSize  Int // bytes
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  design Design @relation(fields: [designId], references: [id], onDelete: Cascade)
+}
+
+model DesignVersion {
+  id           String   @id @default(cuid())
+  designId     String
+  versionNum   Int
+  notes        String?  @db.Text
+  fileSnapshot Json? // snapshot of files at this version
+  createdAt    DateTime @default(now())
+
+  design Design @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  @@unique([designId, versionNum])
+}
+
+model DesignLike {
+  id        String   @id @default(cuid())
+  userId    String
+  designId  String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  design Design @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, designId])
+}
+
+model DesignSave {
+  id        String   @id @default(cuid())
+  userId    String
+  designId  String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  design Design @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, designId])
+}
+
+model DesignFork {
+  id             String   @id @default(cuid())
+  parentDesignId String
+  forkedDesignId String
+  forkedById     String
+  createdAt      DateTime @default(now())
+
+  parentDesign Design @relation("DesignForkRecords", fields: [parentDesignId], references: [id], onDelete: Cascade)
+  forkedDesign Design @relation("DesignForkSource", fields: [forkedDesignId], references: [id], onDelete: Cascade)
+  forkedBy     User   @relation("ForkedBy", fields: [forkedById], references: [id])
+
+  @@unique([parentDesignId, forkedDesignId])
+}
+
+enum CollaboratorRole {
+  OWNER
+  COLLABORATOR
+  VIEWER
+}
+
+enum CollaboratorStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model DesignCollaborator {
+  id        String             @id @default(cuid())
+  designId  String
+  userId    String
+  role      CollaboratorRole   @default(COLLABORATOR)
+  status    CollaboratorStatus @default(PENDING)
+  createdAt DateTime           @default(now())
+
+  design Design @relation(fields: [designId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([designId, userId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODULE B — OPEN PROBLEMS
+// ─────────────────────────────────────────────────────────────
+
+enum ProblemCategory {
+  PRODUCT_DESIGN
+  PACKAGING
+  RETAIL
+  ARCHITECTURE
+  MOBILITY
+  SUSTAINABILITY
+  UX_UI
+  MANUFACTURING
+  BRANDING
+  OTHER
+}
+
+enum ProblemStatus {
+  DRAFT
+  PUBLISHED
+  ACCEPTING_SOLUTIONS
+  REVIEWING
+  WINNER_SELECTED
+  CLOSED
+}
+
+enum RewardType {
+  CASH
+  ROYALTY
+  INTERNSHIP
+  CONTRACT
+  FULL_TIME_OFFER
+  OTHER
+}
+
+enum SubmissionVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+model Problem {
+  id                   String               @id @default(cuid())
+  title                String
+  slug                 String               @unique
+  description          String               @db.Text
+  background           String?              @db.Text
+  deliverables         String?              @db.Text
+  constraints          String?              @db.Text
+  category             ProblemCategory
+  status               ProblemStatus        @default(DRAFT)
+  submissionVisibility SubmissionVisibility @default(PUBLIC)
+  rewardType           RewardType
+  rewardAmount         Float?
+  rewardDetails        String?
+  deadline             DateTime?
+  budget               Float?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  corporateId String
+  corporate   CorporateProfile    @relation(fields: [corporateId], references: [id])
+  submissions ProblemSubmission[]
+  comments    Comment[]           @relation("ProblemComments")
+  reports     Report[]            @relation("ReportedProblem")
+
+  @@index([corporateId])
+  @@index([category])
+  @@index([status])
+  @@index([deadline])
+}
+
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+  SHORTLISTED
+  WINNER
+  REJECTED
+}
+
+model ProblemSubmission {
+  id         String           @id @default(cuid())
+  problemId  String
+  designerId String
+  proposal   String           @db.Text
+  notes      String?          @db.Text
+  status     SubmissionStatus @default(DRAFT)
+  files      Json[] // array of {filename, url, size}
+  videoUrl   String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  problem  Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  designer User    @relation(fields: [designerId], references: [id])
+
+  @@unique([problemId, designerId])
+  @@index([problemId])
+  @@index([designerId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODULE C — OPEN JOBS
+// ─────────────────────────────────────────────────────────────
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  FREELANCE
+  INTERNSHIP
+  CONTRACT
+}
+
+enum JobStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  CLOSED
+}
+
+model Job {
+  id             String    @id @default(cuid())
+  title          String
+  slug           String    @unique
+  employmentType JobType
+  location       String?
+  isRemote       Boolean   @default(false)
+  salaryMin      Float?
+  salaryMax      Float?
+  salaryCurrency String    @default("INR")
+  description    String    @db.Text
+  skills         String[]
+  experience     String?
+  status         JobStatus @default(DRAFT)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  corporateId  String
+  corporate    CorporateProfile @relation(fields: [corporateId], references: [id])
+  applications JobApplication[]
+  reports      Report[]         @relation("ReportedJob")
+
+  @@index([corporateId])
+  @@index([employmentType])
+  @@index([status])
+}
+
+enum ApplicationStatus {
+  APPLIED
+  SHORTLISTED
+  REJECTED
+  CONTACTED
+  HIRED
+}
+
+model JobApplication {
+  id           String            @id @default(cuid())
+  jobId        String
+  applicantId  String
+  resumeUrl    String?
+  portfolioUrl String?
+  coverNote    String?           @db.Text
+  status       ApplicationStatus @default(APPLIED)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  job       Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  applicant User @relation(fields: [applicantId], references: [id])
+
+  @@unique([jobId, applicantId])
+  @@index([jobId])
+  @@index([applicantId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// COMMUNITY
+// ─────────────────────────────────────────────────────────────
+
+enum CommentTargetType {
+  DESIGN
+  PROBLEM
+  JOB
+  EDITORIAL
+}
+
+model Comment {
+  id         String            @id @default(cuid())
+  content    String            @db.Text
+  targetType CommentTargetType
+  authorId   String
+  designId   String?
+  problemId  String?
+  articleId  String?
+  parentId   String? // for threaded replies
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author  User              @relation(fields: [authorId], references: [id])
+  design  Design?           @relation("DesignComments", fields: [designId], references: [id], onDelete: Cascade)
+  problem Problem?          @relation("ProblemComments", fields: [problemId], references: [id], onDelete: Cascade)
+  article EditorialArticle? @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  parent  Comment?          @relation("CommentReplies", fields: [parentId], references: [id])
+  replies Comment[]         @relation("CommentReplies")
+  reports Report[]          @relation("ReportedComment")
+
+  @@index([authorId])
+  @@index([designId])
+  @@index([problemId])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+enum NotificationType {
+  NEW_FOLLOWER
+  NEW_COMMENT
+  NEW_COLLABORATOR_REQUEST
+  COLLABORATOR_ACCEPTED
+  JOB_MATCH
+  PROBLEM_UPDATE
+  DESIGN_LIKED
+  DESIGN_FORKED
+  MESSAGE_RECEIVED
+  SUBMISSION_STATUS_CHANGED
+  JOB_APPLICATION_STATUS
+  SYSTEM
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?
+  linkUrl   String?
+  isRead    Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  senderId    String
+  recipientId String
+  content     String   @db.Text
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  sender    User @relation("Sender", fields: [senderId], references: [id])
+  recipient User @relation("Recipient", fields: [recipientId], references: [id])
+
+  @@index([senderId, recipientId])
+  @@index([recipientId, isRead])
+}
+
+// ─────────────────────────────────────────────────────────────
+// PAYMENTS
+// ─────────────────────────────────────────────────────────────
+
+enum PaymentType {
+  LICENSE_PURCHASE
+  CHALLENGE_REWARD
+  SUBSCRIPTION
+}
+
+enum PaymentStatus {
+  PENDING
+  ESCROW
+  COMPLETED
+  REFUNDED
+  FAILED
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  payerId           String
+  payeeId           String?
+  type              PaymentType
+  status            PaymentStatus @default(PENDING)
+  amount            Float
+  currency          String        @default("INR")
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  metadata          Json?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  licensePurchase LicensePurchase?
+
+  @@index([payerId])
+  @@index([status])
+}
+
+model LicensePurchase {
+  id             String   @id @default(cuid())
+  designId       String
+  buyerId        String
+  paymentId      String   @unique
+  licenseDetails Json?
+  createdAt      DateTime @default(now())
+
+  design  Design  @relation(fields: [designId], references: [id])
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@index([designId])
+  @@index([buyerId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// MODERATION
+// ─────────────────────────────────────────────────────────────
+
+enum ReportType {
+  COPYRIGHT_VIOLATION
+  SPAM
+  ABUSE
+  DUPLICATE_CONTENT
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportTargetType {
+  DESIGN
+  COMMENT
+  USER
+  PROBLEM
+  JOB
+}
+
+model Report {
+  id          String           @id @default(cuid())
+  reporterId  String
+  targetType  ReportTargetType
+  reportType  ReportType
+  description String?          @db.Text
+  status      ReportStatus     @default(PENDING)
+  adminNote   String?
+  reviewedAt  DateTime?
+  createdAt   DateTime         @default(now())
+
+  // Targets (only one will be set)
+  reportedUserId    String?
+  reportedDesignId  String?
+  reportedCommentId String?
+  reportedProblemId String?
+  reportedJobId     String?
+
+  reporter        User     @relation("Reporter", fields: [reporterId], references: [id])
+  reportedUser    User?    @relation("ReportedUser", fields: [reportedUserId], references: [id])
+  reportedDesign  Design?  @relation("ReportedDesign", fields: [reportedDesignId], references: [id])
+  reportedComment Comment? @relation("ReportedComment", fields: [reportedCommentId], references: [id])
+  reportedProblem Problem? @relation("ReportedProblem", fields: [reportedProblemId], references: [id])
+  reportedJob     Job?     @relation("ReportedJob", fields: [reportedJobId], references: [id])
+
+  @@index([status])
+  @@index([reporterId])
+  @@index([targetType])
+}
+
+// ─────────────────────────────────────────────────────────────
+// EDITORIAL
+// ─────────────────────────────────────────────────────────────
+
+enum ArticleType {
+  ARTICLE
+  INTERVIEW
+  TREND_REPORT
+  FEATURED_PROJECT
+  NEWSLETTER
+}
+
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model EditorialArticle {
+  id            String        @id @default(cuid())
+  title         String
+  slug          String        @unique
+  type          ArticleType
+  status        ArticleStatus @default(DRAFT)
+  excerpt       String?
+  content       String        @db.Text
+  coverImageUrl String?
+  tags          String[]
+  readTimeMin   Int?
+  authorId      String
+  publishedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  author   User      @relation(fields: [authorId], references: [id])
+  comments Comment[]
+
+  @@index([type])
+  @@index([status])
+  @@index([publishedAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// PLATFORM SETTINGS (admin-editable, all in one place)
+// ─────────────────────────────────────────────────────────────
+
+model PlatformSetting {
+  id        String   @id @default(cuid())
+  section   String // email | database | storage | payments | auth | platform
+  key       String
+  value     String   @db.Text
+  isSecret  Boolean  @default(false) // if true, mask in UI
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@unique([section, key])
+  @@index([section])
+}
+
+// ─────────────────────────────────────────────────────────────
+// AUDIT LOG
+// ─────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String // e.g. "user.suspend", "design.delete", "settings.update"
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+}
