@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { useDropzone } from "react-dropzone";
-import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/Button";
-import { Input, Label, FormGroup, Select } from "@/components/ui/Input";
+import { FormGroup, Input, Label, Select } from "@/components/ui/Input";
 import { useToast } from "@/components/ui/Toaster";
-import { Upload, X, File as FileIcon, ChevronLeft } from "lucide-react";
-import { cn, DESIGN_CATEGORIES, LICENSE_TYPES, formatBytes, ALLOWED_FILE_TYPES, MAX_FILE_SIZE } from "@/lib/utils";
+import { cn, DESIGN_CATEGORIES, formatBytes, LICENSE_TYPES, MAX_FILE_SIZE } from "@/lib/utils";
+import { ChevronLeft, File as FileIcon, Upload, X } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useCallback, useState } from "react";
+import { useDropzone } from "react-dropzone";
 
 export default function PublishDesignPage() {
   const router = useRouter();

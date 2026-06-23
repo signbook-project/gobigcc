@@ -31,11 +31,34 @@ export const DESIGN_CATEGORIES = [
   { value: "OTHER", label: "Other" },
 ];
 
+// export const LICENSE_TYPES = [
+//   { value: "OPEN_SOURCE", label: "Open Source" },
+//   { value: "ROYALTY_BASED", label: "Royalty Based" },
+//   { value: "COLLABORATION_ONLY", label: "Collaboration Only" },
+//   { value: "CUSTOM", label: "Custom" },
+// ];
+
 export const LICENSE_TYPES = [
-  { value: "OPEN_SOURCE", label: "Open Source" },
-  { value: "ROYALTY_BASED", label: "Royalty Based" },
-  { value: "COLLABORATION_ONLY", label: "Collaboration Only" },
-  { value: "CUSTOM", label: "Custom" },
+  {
+    value: "OPEN_SOURCE",
+    label: "Open Source",
+    desc: "Anyone can use and modify the design."
+  },
+  {
+    value: "ROYALTY_BASED",
+    label: "Royalty Based",
+    desc: "Usage requires royalty payments."
+  },
+  {
+    value: "COLLABORATION_ONLY",
+    label: "Collaboration Only",
+    desc: "Available only through collaboration."
+  },
+  {
+    value: "CUSTOM",
+    label: "Custom",
+    desc: "Custom licensing terms apply."
+  },
 ];
 
 // export function timeAgo(date: Date): string {
