@@ -23,7 +23,7 @@ module.exports = require("@prisma/client");
 
 /***/ }),
 
-/***/ "./action-async-storage.external?8dda":
+/***/ "./action-async-storage.external":
 /*!*******************************************************************************!*\
   !*** external "next/dist/client/components/action-async-storage.external.js" ***!
   \*******************************************************************************/
@@ -33,7 +33,7 @@ module.exports = require("next/dist/client/components/action-async-storage.exter
 
 /***/ }),
 
-/***/ "./request-async-storage.external?3d59":
+/***/ "./request-async-storage.external":
 /*!********************************************************************************!*\
   !*** external "next/dist/client/components/request-async-storage.external.js" ***!
   \********************************************************************************/
@@ -43,7 +43,7 @@ module.exports = require("next/dist/client/components/request-async-storage.exte
 
 /***/ }),
 
-/***/ "./static-generation-async-storage.external?16bc":
+/***/ "./static-generation-async-storage.external":
 /*!******************************************************************************************!*\
   !*** external "next/dist/client/components/static-generation-async-storage.external.js" ***!
   \******************************************************************************************/
@@ -130,7 +130,7 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export */ __webpac
 var __webpack_require__ = require("../../../../webpack-runtime.js");
 __webpack_require__.C(exports);
 var __webpack_exec__ = (moduleId) => (__webpack_require__(__webpack_require__.s = moduleId))
-var __webpack_exports__ = __webpack_require__.X(0, ["vendor-chunks/next","vendor-chunks/@auth","vendor-chunks/next-auth","vendor-chunks/zod","vendor-chunks/jose","vendor-chunks/oauth4webapi","vendor-chunks/bcryptjs","vendor-chunks/preact","vendor-chunks/preact-render-to-string","vendor-chunks/@panva"], () => (__webpack_exec__("(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fadmin%2Fpending-counts%2Froute&page=%2Fapi%2Fadmin%2Fpending-counts%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fadmin%2Fpending-counts%2Froute.ts&appDir=C%3A%5CUsers%5CShaik%20Rehana%5CDesktop%5CGoBig-Creative-hub%5Cgobig%5Csrc%5Capp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=C%3A%5CUsers%5CShaik%20Rehana%5CDesktop%5CGoBig-Creative-hub%5Cgobig&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!")));
+var __webpack_exports__ = __webpack_require__.X(0, ["vendor-chunks/next","vendor-chunks/@auth","vendor-chunks/jose","vendor-chunks/zod","vendor-chunks/next-auth","vendor-chunks/@panva","vendor-chunks/preact","vendor-chunks/bcryptjs","vendor-chunks/preact-render-to-string","vendor-chunks/oauth4webapi"], () => (__webpack_exec__("(rsc)/./node_modules/next/dist/build/webpack/loaders/next-app-loader.js?name=app%2Fapi%2Fadmin%2Fpending-counts%2Froute&page=%2Fapi%2Fadmin%2Fpending-counts%2Froute&appPaths=&pagePath=private-next-app-dir%2Fapi%2Fadmin%2Fpending-counts%2Froute.ts&appDir=C%3A%5CUsers%5CShaik%20Rehana%5CDesktop%5CGoBig-Creative-hub%5Cgobig%5Csrc%5Capp&pageExtensions=tsx&pageExtensions=ts&pageExtensions=jsx&pageExtensions=js&rootDir=C%3A%5CUsers%5CShaik%20Rehana%5CDesktop%5CGoBig-Creative-hub%5Cgobig&isDev=true&tsconfigPath=tsconfig.json&basePath=&assetPrefix=&nextConfigOutput=&preferredRegion=&middlewareConfig=e30%3D!")));
 module.exports = __webpack_exports__;
 
 })();
