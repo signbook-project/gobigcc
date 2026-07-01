@@ -1,9 +1,10 @@
-import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { Navbar } from "@/components/layout/Navbar";
 import { Badge } from "@/components/ui/Card";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { timeAgo } from "@/lib/utils";
-import { BookOpen, Mic, TrendingUp, Star, Mail } from "lucide-react";
+import { BookOpen, Mail, Mic, Plus, Star, TrendingUp } from "lucide-react";
+import Link from "next/link";
 
 const TYPES = [
   { value: "", label: "All" },
@@ -35,6 +36,8 @@ export default async function EditorialPage({
   searchParams: { type?: string; page?: string };
 }) {
   const page = Number(searchParams.page ?? 1);
+  const session = await auth();
+  const isAdmin = (session?.user as any)?.role === "ADMIN";
   const where: any = { status: "PUBLISHED" };
   if (searchParams.type) where.type = searchParams.type;
 
@@ -57,11 +60,19 @@ export default async function EditorialPage({
     <>
       <Navbar />
       <div className="mx-auto max-w-5xl px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold">Editorial</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Trend reports, interviews, and featured projects from the design world.
-          </p>
+        <div className="mb-8 flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-semibold">Editorial</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Trend reports, interviews, and featured projects from the design world.
+            </p>
+          </div>
+          {isAdmin && (
+            <Link href="/admin/editorial/new"
+              className="flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 shrink-0">
+              <Plus className="h-4 w-4" /> New article
+            </Link>
+          )}
         </div>
 
         {/* Type filter */}

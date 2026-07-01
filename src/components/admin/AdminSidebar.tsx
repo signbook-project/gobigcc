@@ -1,67 +1,84 @@
 "use client";
 
+import { cn } from "@/lib/utils";
+import {
+  BarChart3,
+  Bell,
+  BookOpen,
+  Building,
+  ChevronDown, ChevronRight,
+  Cloud,
+  CreditCard,
+  Database,
+  FileImage,
+  Flag,
+  LayoutDashboard,
+  Lock,
+  Menu,
+  Scale,
+  Settings,
+  Shield,
+  UserCog,
+  Users,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import {
-  LayoutDashboard, Users, FileImage, CreditCard, Flag,
-  BookOpen, Settings, ChevronDown, ChevronRight,
-  Shield, Bell, Database, Cloud, Lock, Scale,
-  UserCog, Building, BarChart3, Menu, X,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
 
 type NavItem = { href: string; label: string; icon: React.ElementType; badge?: string };
 type NavSection = { section: string; items: NavItem[] };
 
-const NAV_SECTIONS: NavSection[] = [
-  {
-    section: "Overview",
-    items: [
-      { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
-    ],
-  },
-  {
-    section: "People",
-    items: [
-      { href: "/admin/users", label: "Users", icon: Users },
-      { href: "/admin/designers", label: "Designers", icon: UserCog },
-      { href: "/admin/corporates", label: "Companies", icon: Building },
-    ],
-  },
-  {
-    section: "Content",
-    items: [
-      { href: "/admin/content", label: "Designs", icon: FileImage },
-      { href: "/admin/problems", label: "Challenges", icon: Shield },
-      { href: "/admin/jobs", label: "Jobs", icon: Building },
-      { href: "/admin/editorial", label: "Editorial", icon: BookOpen },
-    ],
-  },
-  {
-    section: "Operations",
-    items: [
-      { href: "/admin/payments", label: "Payments", icon: CreditCard },
-      { href: "/admin/reports", label: "Reports", icon: Flag },
-      { href: "/admin/notifications", label: "Notifications", icon: Bell },
-    ],
-  },
-  {
-    section: "Settings",
-    items: [
-      { href: "/admin/settings", label: "Email", icon: Bell },
-      { href: "/admin/settings/database", label: "Database", icon: Database },
-      { href: "/admin/settings/storage", label: "Storage", icon: Cloud },
-      { href: "/admin/settings/payments", label: "Payments", icon: CreditCard },
-      { href: "/admin/settings/auth", label: "Auth & Security", icon: Lock },
-      { href: "/admin/settings/platform", label: "Platform", icon: Settings },
-      { href: "/admin/settings/admin-accounts", label: "Admin Accounts", icon: UserCog },
-      { href: "/admin/settings/moderation", label: "Moderation Rules", icon: Shield },
-      { href: "/admin/settings/legal", label: "Legal / Compliance", icon: Scale },
-    ],
-  },
-];
+function buildNavSections(counts: { pendingJobs: number; pendingReports: number }): NavSection[] {
+  return [
+    {
+      section: "Overview",
+      items: [
+        { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+      ],
+    },
+    {
+      section: "People",
+      items: [
+        { href: "/admin/users", label: "Users", icon: Users },
+        { href: "/admin/designers", label: "Designers", icon: UserCog },
+        { href: "/admin/corporates", label: "Companies", icon: Building },
+      ],
+    },
+    {
+      section: "Content",
+      items: [
+        { href: "/admin/content", label: "Designs", icon: FileImage },
+        { href: "/admin/problems", label: "Challenges", icon: Shield },
+        { href: "/admin/jobs", label: "Jobs", icon: Building, badge: counts.pendingJobs > 0 ? String(counts.pendingJobs) : undefined },
+        { href: "/admin/editorial", label: "Editorial", icon: BookOpen },
+      ],
+    },
+    {
+      section: "Operations",
+      items: [
+        { href: "/admin/payments", label: "Payments", icon: CreditCard },
+        { href: "/admin/reports", label: "Reports", icon: Flag, badge: counts.pendingReports > 0 ? String(counts.pendingReports) : undefined },
+        { href: "/admin/notifications", label: "Notifications", icon: Bell },
+      ],
+    },
+    {
+      section: "Settings",
+      items: [
+        { href: "/admin/settings", label: "Email", icon: Bell },
+        { href: "/admin/settings/database", label: "Database", icon: Database },
+        { href: "/admin/settings/storage", label: "Storage", icon: Cloud },
+        { href: "/admin/settings/payments", label: "Payments", icon: CreditCard },
+        { href: "/admin/settings/auth", label: "Auth & Security", icon: Lock },
+        { href: "/admin/settings/platform", label: "Platform", icon: Settings },
+        { href: "/admin/settings/admin-accounts", label: "Admin Accounts", icon: UserCog },
+        { href: "/admin/settings/moderation", label: "Moderation Rules", icon: Shield },
+        { href: "/admin/settings/legal", label: "Legal / Compliance", icon: Scale },
+      ],
+    },
+  ];
+}
 
 function SidebarSection({
   section,
@@ -141,6 +158,22 @@ function SidebarSection({
 export function AdminSidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const [counts, setCounts] = useState({ pendingJobs: 0, pendingReports: 0 });
+
+  useEffect(() => {
+    let active = true;
+    function load() {
+      fetch("/api/admin/pending-counts")
+        .then(r => r.json())
+        .then(d => { if (active && d.success) setCounts({ pendingJobs: d.pendingJobs, pendingReports: d.pendingReports }); })
+        .catch(() => {});
+    }
+    load();
+    const interval = setInterval(load, 30_000);
+    return () => { active = false; clearInterval(interval); };
+  }, []);
+
+  const navSections = buildNavSections(counts);
 
   return (
     <aside
@@ -166,7 +199,7 @@ export function AdminSidebar() {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-3">
-        {NAV_SECTIONS.map((sec) => (
+        {navSections.map((sec) => (
           <SidebarSection
             key={sec.section}
             section={sec.section}

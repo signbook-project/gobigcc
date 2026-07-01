@@ -57,6 +57,8 @@ model User {
   comments           Comment[]
   problemSubmissions ProblemSubmission[]
   jobApplications    JobApplication[]
+  jobsPosted         Job[]                @relation("JobPostedBy")
+  jobsReviewed       Job[]                @relation("JobReviewedBy")
   sentMessages       Message[]            @relation("Sender")
   receivedMessages   Message[]            @relation("Recipient")
   notifications      Notification[]
@@ -229,8 +231,8 @@ model Design {
   saves            DesignSave[]
   comments         Comment[]            @relation("DesignComments")
   collaborators    DesignCollaborator[]
-  forkRecords      DesignFork[]         @relation("DesignForkRecords")
-  forkedFromRecord DesignFork[]         @relation("DesignForkSource")
+  forkRecords      DesignFork[]         @relation("ForkedDesigns")
+  forksAsParent    DesignFork[]         @relation("DesignForkParent")
   reports          Report[]             @relation("ReportedDesign")
   licensePurchases LicensePurchase[]
 
@@ -299,8 +301,8 @@ model DesignFork {
   forkedById     String
   createdAt      DateTime @default(now())
 
-  parentDesign Design @relation("DesignForkRecords", fields: [parentDesignId], references: [id], onDelete: Cascade)
-  forkedDesign Design @relation("DesignForkSource", fields: [forkedDesignId], references: [id], onDelete: Cascade)
+  parentDesign Design @relation("DesignForkParent", fields: [parentDesignId], references: [id], onDelete: Cascade)
+  forkedDesign Design @relation("ForkedDesigns", fields: [forkedDesignId], references: [id], onDelete: Cascade)
   forkedBy     User   @relation("ForkedBy", fields: [forkedById], references: [id])
 
   @@unique([parentDesignId, forkedDesignId])
@@ -447,7 +449,9 @@ enum JobType {
 
 enum JobStatus {
   DRAFT
+  PENDING_REVIEW
   ACTIVE
+  REJECTED
   PAUSED
   CLOSED
 }
@@ -465,18 +469,36 @@ model Job {
   description    String    @db.Text
   skills         String[]
   experience     String?
-  status         JobStatus @default(DRAFT)
+  status         JobStatus @default(PENDING_REVIEW)
+
+  // Who actually submitted this posting (any signed-in user — designer, corporate, or visitor)
+  postedById String
+  postedBy   User   @relation("JobPostedBy", fields: [postedById], references: [id])
+
+  // Company identity shown on the listing.
+  // If the poster has a CorporateProfile, corporateId is set automatically.
+  // Otherwise companyNameOverride + contactEmail capture who to credit/notify.
+  corporateId         String?
+  corporate           CorporateProfile? @relation(fields: [corporateId], references: [id])
+  companyNameOverride String?
+  contactEmail        String?
+
+  // Moderation
+  reviewedById    String?
+  reviewedBy      User?     @relation("JobReviewedBy", fields: [reviewedById], references: [id])
+  reviewedAt      DateTime?
+  rejectionReason String?
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   publishedAt DateTime?
 
-  corporateId  String
-  corporate    CorporateProfile @relation(fields: [corporateId], references: [id])
   applications JobApplication[]
   reports      Report[]         @relation("ReportedJob")
+  comments     Comment[]        @relation("JobComments")
 
   @@index([corporateId])
+  @@index([postedById])
   @@index([employmentType])
   @@index([status])
 }
@@ -526,6 +548,7 @@ model Comment {
   authorId   String
   designId   String?
   problemId  String?
+  jobId      String?
   articleId  String?
   parentId   String? // for threaded replies
 
@@ -535,6 +558,7 @@ model Comment {
   author  User              @relation(fields: [authorId], references: [id])
   design  Design?           @relation("DesignComments", fields: [designId], references: [id], onDelete: Cascade)
   problem Problem?          @relation("ProblemComments", fields: [problemId], references: [id], onDelete: Cascade)
+  job     Job?              @relation("JobComments", fields: [jobId], references: [id], onDelete: Cascade)
   article EditorialArticle? @relation(fields: [articleId], references: [id], onDelete: Cascade)
   parent  Comment?          @relation("CommentReplies", fields: [parentId], references: [id])
   replies Comment[]         @relation("CommentReplies")
@@ -543,6 +567,7 @@ model Comment {
   @@index([authorId])
   @@index([designId])
   @@index([problemId])
+  @@index([jobId])
 }
 
 model Follow {

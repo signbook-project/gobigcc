@@ -3,14 +3,16 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Heart, Bookmark, GitFork, Share2, Users, Flag } from "lucide-react";
+import { Heart, Bookmark, GitFork, Users, Flag } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toaster";
 import { cn, formatNumber } from "@/lib/utils";
+import { ShareButton } from "@/components/shared/ShareButton";
 
 interface Props {
   designId: string;
   designSlug: string;
+  designTitle: string;
   authorId: string;
   initialLiked: boolean;
   initialSaved: boolean;
@@ -20,13 +22,13 @@ interface Props {
 }
 
 export function DesignActions({
-  designId, designSlug, authorId,
+  designId, designSlug, designTitle, authorId,
   initialLiked, initialSaved, initialLikes,
   licenseType, collab,
 }: Props) {
   const { data: session } = useSession();
   const router = useRouter();
-  const { success, error, info } = useToast();
+  const { success, error } = useToast();
   const [liked, setLiked] = useState(initialLiked);
   const [saved, setSaved] = useState(initialSaved);
   const [likes, setLikes] = useState(initialLikes);
@@ -58,16 +60,6 @@ export function DesignActions({
     } else {
       const d = await res.json();
       error(d.error ?? "Fork failed");
-    }
-  }
-
-  async function handleShare() {
-    const url = `${window.location.origin}/designs/${designSlug}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      success("Link copied to clipboard");
-    } catch {
-      info("Share this link", url);
     }
   }
 
@@ -112,12 +104,7 @@ export function DesignActions({
         </Button>
       )}
 
-      <button
-        onClick={handleShare}
-        className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-secondary text-muted-foreground"
-      >
-        <Share2 className="h-4 w-4" /> Share
-      </button>
+      <ShareButton url={`/designs/${designSlug}`} title={designTitle} />
 
       {collab && (
         <Button variant="outline" size="sm" className="gap-2">

@@ -49,7 +49,30 @@ export default function PublishDesignPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    // Title always required
     if (!form.title.trim()) { error("Title is required"); return; }
+
+    // For Public/Unlisted visibility, enforce full validation
+    if (form.visibility !== "DRAFT") {
+      if (!form.description.trim() || form.description.trim().length < 20) {
+        error("Description is required", "Please write at least 20 characters describing your design.");
+        return;
+      }
+      if (!form.category) {
+        error("Category is required");
+        return;
+      }
+      if (form.identityType === "ALIAS" && !form.publishedAlias.trim()) {
+        error("Alias name is required", "Enter the alias you'd like to publish under.");
+        return;
+      }
+      if (files.length === 0) {
+        error("At least one file is required", "Upload an image, PDF, or other file showcasing your design.");
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -102,18 +125,20 @@ export default function PublishDesignPage() {
               </FormGroup>
 
               <FormGroup>
-                <Label>Description</Label>
+                <Label>Description {form.visibility !== "DRAFT" && <span className="text-destructive">*</span>}</Label>
                 <textarea
                   className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-vertical"
-                  placeholder="What is this design? What problem does it solve? Who is it for?"
+                  placeholder="What is this design? What problem does it solve? Who is it for? (min. 20 characters)"
                   value={form.description}
                   onChange={e => set("description", e.target.value)}
+                  required={form.visibility !== "DRAFT"}
                 />
+                <p className="text-xs text-muted-foreground mt-1">{form.description.length}/20 minimum characters</p>
               </FormGroup>
 
               <div className="grid grid-cols-2 gap-4">
                 <FormGroup>
-                  <Label>Category</Label>
+                  <Label>Category {form.visibility !== "DRAFT" && <span className="text-destructive">*</span>}</Label>
                   <Select value={form.category} onChange={e => set("category", e.target.value)}>
                     {DESIGN_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                   </Select>
@@ -146,7 +171,7 @@ export default function PublishDesignPage() {
 
               {/* File upload */}
               <FormGroup>
-                <Label>Upload files</Label>
+                <Label>Upload files {form.visibility !== "DRAFT" && <span className="text-destructive">*</span>}</Label>
                 <div
                   {...getRootProps()}
                   className={cn(
@@ -160,7 +185,7 @@ export default function PublishDesignPage() {
                     {isDragActive ? "Drop files here…" : "Drag & drop or click to upload"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    JPG, PNG, SVG, PDF, PSD, AI, CAD, ZIP — max 200 MB per file
+                    JPG, PNG, SVG, PDF, PSD, AI, CAD, ZIP — max 200 MB per file{form.visibility !== "DRAFT" ? " — at least one file required" : ""}
                   </p>
                 </div>
                 {files.length > 0 && (

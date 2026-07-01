@@ -1,12 +1,14 @@
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { Navbar } from "@/components/layout/Navbar";
-import { Badge } from "@/components/ui/Card";
-import { formatCurrency, timeAgo } from "@/lib/utils";
-import { auth } from "@/lib/auth";
-import { Trophy, Clock, Users, Building, ChevronLeft } from "lucide-react";
 import { SubmitSolutionForm } from "@/components/problems/SubmitSolutionForm";
+import { CommentSection } from "@/components/shared/CommentSection";
+import { ShareButton } from "@/components/shared/ShareButton";
+import { Badge } from "@/components/ui/Card";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { formatCurrency, timeAgo } from "@/lib/utils";
+import { Building, ChevronLeft, Clock, Trophy, Users } from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
 const STATUS_VARIANTS: Record<string, any> = {
   ACCEPTING_SOLUTIONS: "success",
@@ -46,6 +48,16 @@ export default async function ProblemDetailPage({ params }: { params: { slug: st
     alreadySubmitted = !!existing;
   }
 
+  const comments = await prisma.comment.findMany({
+    where: { problemId: problem.id, parentId: null },
+    include: {
+      author: { include: { designerProfile: true } },
+      replies: { include: { author: { include: { designerProfile: true } } } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+  });
+
   return (
     <>
       <Navbar />
@@ -60,9 +72,12 @@ export default async function ProblemDetailPage({ params }: { params: { slug: st
             <div>
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <h1 className="text-2xl font-semibold">{problem.title}</h1>
-                <Badge variant={STATUS_VARIANTS[problem.status] ?? "secondary"}>
-                  {STATUS_LABELS[problem.status] ?? problem.status}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant={STATUS_VARIANTS[problem.status] ?? "secondary"}>
+                    {STATUS_LABELS[problem.status] ?? problem.status}
+                  </Badge>
+                  <ShareButton url={`/problems/${problem.slug}`} title={problem.title} />
+                </div>
               </div>
               <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground flex-wrap">
                 <span className="flex items-center gap-1.5">
@@ -128,6 +143,15 @@ export default async function ProblemDetailPage({ params }: { params: { slug: st
                 </Link>
               </div>
             )}
+
+            <CommentSection
+              targetType="PROBLEM"
+              targetId={problem.id}
+              comments={comments as any}
+              currentUserId={session?.user?.id}
+              heading="Discussion"
+              emptyText="No questions or comments yet. Ask the company anything about this brief."
+            />
           </div>
 
           {/* Sidebar */}

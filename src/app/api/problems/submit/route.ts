@@ -1,7 +1,8 @@
+import { auth } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
+import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
 
 const schema = z.object({
   problemId: z.string(),
@@ -20,7 +21,10 @@ export async function POST(req: NextRequest) {
 
   const { problemId, proposal, notes, videoUrl } = parsed.data;
 
-  const problem = await prisma.problem.findUnique({ where: { id: problemId } });
+  const problem = await prisma.problem.findUnique({
+    where: { id: problemId },
+    include: { corporate: true },
+  });
   if (!problem || problem.status !== "ACCEPTING_SOLUTIONS")
     return NextResponse.json({ error: "Challenge is not accepting solutions" }, { status: 400 });
 
@@ -42,6 +46,20 @@ export async function POST(req: NextRequest) {
   await prisma.designerProfile.updateMany({
     where: { userId: session.user.id },
     data: { creativeScore: { increment: 5 } },
+  });
+
+  // Notify the company that posted the challenge — corporate.userId is the actual User id
+  const designer = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    include: { designerProfile: true },
+  });
+  const designerName = designer?.designerProfile?.alias ?? designer?.name ?? "A designer";
+  await createNotification({
+    userId: problem.corporate.userId,
+    type: "PROBLEM_UPDATE",
+    title: `New submission for "${problem.title}"`,
+    body: designerName,
+    linkUrl: `/problems/${problem.slug}`,
   });
 
   return NextResponse.json({ success: true, submission }, { status: 201 });

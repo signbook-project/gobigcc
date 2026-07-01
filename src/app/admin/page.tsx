@@ -14,6 +14,7 @@ async function getDashboardData() {
     totalUsers, newUsersWeek,
     totalDesigns, newDesignsWeek,
     pendingReports,
+    pendingJobs,
     revenueMonth,
     recentReports,
     recentUsers,
@@ -23,6 +24,7 @@ async function getDashboardData() {
     prisma.design.count({ where: { visibility: "PUBLIC" } }),
     prisma.design.count({ where: { publishedAt: { gte: weekAgo } } }),
     prisma.report.count({ where: { status: "PENDING" } }),
+    prisma.job.count({ where: { status: "PENDING_REVIEW" } }),
     prisma.payment.aggregate({
       where: { status: "COMPLETED", createdAt: { gte: monthStart } },
       _sum: { amount: true },
@@ -44,6 +46,7 @@ async function getDashboardData() {
     totalUsers, newUsersWeek,
     totalDesigns, newDesignsWeek,
     pendingReports,
+    pendingJobs,
     revenueMonth: revenueMonth._sum.amount ?? 0,
     recentReports,
     recentUsers,
@@ -80,6 +83,7 @@ export default async function AdminDashboard() {
         <StatCard label="Total users" value={d.totalUsers.toLocaleString()} delta={`+${d.newUsersWeek} this week`} />
         <StatCard label="Designs published" value={d.totalDesigns.toLocaleString()} delta={`+${d.newDesignsWeek} this week`} />
         <StatCard label="Pending reports" value={d.pendingReports} delta={d.pendingReports > 0 ? "Needs review" : "All clear"} />
+        <StatCard label="Pending jobs" value={d.pendingJobs} delta={d.pendingJobs > 0 ? "Awaiting approval" : "All clear"} />
         <StatCard label="Revenue MTD" value={formatCurrency(d.revenueMonth)} delta="+18% vs last month" />
       </div>
 
@@ -94,7 +98,7 @@ export default async function AdminDashboard() {
             {d.recentReports.length === 0 && (
               <p className="p-4 text-sm text-muted-foreground">No pending reports</p>
             )}
-            {d.recentReports.map((r: (typeof d.recentReports)[number]) => (
+            {d.recentReports.map((r) => (
               <div key={r.id} className="flex items-center gap-3 px-4 py-3">
                 <Badge variant="warning" className="shrink-0">{REPORT_TYPE_LABELS[r.reportType] ?? r.reportType}</Badge>
                 <div className="flex-1 min-w-0">
@@ -116,8 +120,7 @@ export default async function AdminDashboard() {
             <Link href="/admin/users" className="text-xs text-muted-foreground hover:text-foreground">View all →</Link>
           </div>
           <div className="divide-y">
-            
-            {d.recentUsers.map((u: (typeof d.recentUsers)[number]) => (
+            {d.recentUsers.map((u) => (
               <div key={u.id} className="flex items-center gap-3 px-4 py-3">
                 <div className="h-8 w-8 rounded-full bg-secondary border flex items-center justify-center text-xs font-medium shrink-0">
                   {u.name?.[0]?.toUpperCase() ?? u.email[0].toUpperCase()}

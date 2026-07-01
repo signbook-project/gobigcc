@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { notifyDesignForked } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { uniqueSlug } from "@/lib/utils";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth();
@@ -50,6 +51,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     where: { userId: session.user.id },
     data: { creativeScore: { increment: 3 } },
   });
+
+  // Notify the original author someone built on their work
+  if (parent.authorId !== session.user.id) {
+    const forker = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: { designerProfile: true },
+    });
+    const forkerName = forker?.designerProfile?.alias ?? forker?.name ?? "Someone";
+    notifyDesignForked(parent.authorId, forkerName, parent.title, fork.slug).catch(console.error);
+  }
 
   return NextResponse.json({ success: true, slug: fork.slug, id: fork.id }, { status: 201 });
 }

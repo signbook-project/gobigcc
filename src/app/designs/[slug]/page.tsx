@@ -1,13 +1,13 @@
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import { prisma } from "@/lib/prisma";
-import { Navbar } from "@/components/layout/Navbar";
-import { Badge } from "@/components/ui/Card";
-import { formatNumber, timeAgo, formatBytes } from "@/lib/utils";
-import { auth } from "@/lib/auth";
-import { ChevronLeft, Heart, Bookmark, Share2, GitFork, Download, Users, Flag } from "lucide-react";
 import { DesignActions } from "@/components/design/DesignActions";
-import { CommentSection } from "@/components/design/CommentSection";
+import { Navbar } from "@/components/layout/Navbar";
+import { CommentSection } from "@/components/shared/CommentSection";
+import { Badge } from "@/components/ui/Card";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { formatBytes, formatNumber, timeAgo } from "@/lib/utils";
+import { ChevronLeft, Download, GitFork, Heart, Users } from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
 const LICENSE_LABELS: Record<string, string> = {
   OPEN_SOURCE: "Open Source", ROYALTY_BASED: "Royalty Based",
@@ -21,8 +21,17 @@ const LICENSE_VARIANTS: Record<string, any> = {
 export default async function DesignDetailPage({ params }: { params: { slug: string } }) {
   const session = await auth();
 
+  const designLookup = await prisma.design.findUnique({
+    where: { slug: params.slug },
+    select: { id: true, visibility: true, authorId: true, parentDesignId: true },
+  });
+  if (!designLookup) notFound();
+
+  const isOwner = session?.user?.id === designLookup.authorId;
+  if (designLookup.visibility === "DRAFT" && !isOwner) notFound();
+
   const design = await prisma.design.findUnique({
-    where: { slug: params.slug, visibility: { in: ["PUBLIC", "UNLISTED"] } },
+    where: { slug: params.slug },
     include: {
       author: { include: { designerProfile: true } },
       files: { orderBy: { sortOrder: "asc" } },
@@ -72,6 +81,21 @@ export default async function DesignDetailPage({ params }: { params: { slug: str
         <Link href="/designs" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6">
           <ChevronLeft className="h-4 w-4" /> Back to designs
         </Link>
+
+        {design.visibility === "DRAFT" && isOwner && (
+          <div className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-amber-800">This design is a draft — only you can see it.</p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                {design.parentDesignId ? "Forked from another design. " : ""}Finish editing and publish it to make it public.
+              </p>
+            </div>
+            <Link href="/profile/edit"
+              className="shrink-0 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 transition-colors">
+              Go to your profile
+            </Link>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main */}
@@ -131,6 +155,7 @@ export default async function DesignDetailPage({ params }: { params: { slug: str
             <DesignActions
               designId={design.id}
               designSlug={design.slug}
+              designTitle={design.title}
               authorId={design.authorId}
               initialLiked={userLiked}
               initialSaved={userSaved}
@@ -185,7 +210,7 @@ export default async function DesignDetailPage({ params }: { params: { slug: str
                         <p className="text-sm font-medium truncate">{f.filename}</p>
                         <p className="text-xs text-muted-foreground">{formatBytes(f.fileSize)}</p>
                       </div>
-                      <a href={f.fileUrl} download={f.filename}
+                      <a href={`/api/designs/files/${f.id}/download`}
                         className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs hover:bg-background transition-colors">
                         <Download className="h-3 w-3" /> Download
                       </a>
@@ -214,7 +239,8 @@ export default async function DesignDetailPage({ params }: { params: { slug: str
 
             {/* Comments */}
             <CommentSection
-              designId={design.id}
+              targetType="DESIGN"
+              targetId={design.id}
               comments={comments as any}
               currentUserId={session?.user?.id}
             />

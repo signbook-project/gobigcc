@@ -1,8 +1,8 @@
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { uniqueSlug } from "@/lib/utils";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/lib/auth";
-import { uniqueSlug } from "@/lib/utils";
 
 // GET /api/designs
 export async function GET(req: NextRequest) {
@@ -46,11 +46,11 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ data, total, page, perPage, totalPages: Math.ceil(total / perPage) });
 }
 
-const createSchema = z.object({
-  title: z.string().min(3).max(200),
-  description: z.string().optional(),
+const baseSchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters").max(200),
+  description: z.string().optional().default(""),
   designNotes: z.string().optional(),
-  category: z.string(),
+  category: z.string().optional().default(""),
   tags: z.array(z.string()).default([]),
   visibility: z.enum(["PUBLIC", "UNLISTED", "DRAFT"]).default("DRAFT"),
   identityType: z.enum(["REAL_NAME", "ALIAS"]).default("REAL_NAME"),
@@ -58,6 +58,33 @@ const createSchema = z.object({
   licenseType: z.enum(["OPEN_SOURCE", "ROYALTY_BASED", "COLLABORATION_ONLY", "CUSTOM"]).default("OPEN_SOURCE"),
   licenseDetails: z.record(z.any()).optional(),
   figmaLink: z.string().url().optional().or(z.literal("")),
+});
+
+const createSchema = baseSchema.superRefine((data, ctx) => {
+  // Drafts can be incomplete — skip strict checks
+  if (data.visibility === "DRAFT") return;
+
+  if (!data.description || data.description.trim().length < 20) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Description must be at least 20 characters to publish",
+      path: ["description"],
+    });
+  }
+  if (!data.category) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Category is required to publish",
+      path: ["category"],
+    });
+  }
+  if (data.identityType === "ALIAS" && (!data.publishedAlias || !data.publishedAlias.trim())) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Alias name is required when publishing under an alias",
+      path: ["publishedAlias"],
+    });
+  }
 });
 
 // POST /api/designs
@@ -77,7 +104,7 @@ export async function POST(req: NextRequest) {
       data: {
         ...data,
         slug,
-        category: data.category as any,
+        category: (data.category || "OTHER") as any,
         licenseType: data.licenseType as any,
         authorId: session.user.id,
         publishedAt: data.visibility === "PUBLIC" ? new Date() : null,

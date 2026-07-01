@@ -1,12 +1,14 @@
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import { prisma } from "@/lib/prisma";
-import { Navbar } from "@/components/layout/Navbar";
-import { Badge } from "@/components/ui/Card";
-import { timeAgo } from "@/lib/utils";
-import { auth } from "@/lib/auth";
-import { MapPin, Briefcase, Clock, ChevronLeft, Users } from "lucide-react";
 import { ApplyJobForm } from "@/components/jobs/ApplyJobForm";
+import { Navbar } from "@/components/layout/Navbar";
+import { CommentSection } from "@/components/shared/CommentSection";
+import { ShareButton } from "@/components/shared/ShareButton";
+import { Badge } from "@/components/ui/Card";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { timeAgo } from "@/lib/utils";
+import { Briefcase, ChevronLeft, Clock, MapPin, Users } from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
 const TYPE_LABELS: Record<string, string> = {
   FULL_TIME: "Full time", PART_TIME: "Part time", FREELANCE: "Freelance",
@@ -29,6 +31,8 @@ export default async function JobDetailPage({ params }: { params: { slug: string
   });
   if (!job || job.status !== "ACTIVE") notFound();
 
+  const companyName = job.corporate?.companyName ?? job.companyNameOverride ?? "Company";
+
   let alreadyApplied = false;
   if (session?.user) {
     const existing = await prisma.jobApplication.findFirst({
@@ -36,6 +40,16 @@ export default async function JobDetailPage({ params }: { params: { slug: string
     });
     alreadyApplied = !!existing;
   }
+
+  const comments = await prisma.comment.findMany({
+    where: { jobId: job.id, parentId: null },
+    include: {
+      author: { include: { designerProfile: true } },
+      replies: { include: { author: { include: { designerProfile: true } } } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+  });
 
   return (
     <>
@@ -50,11 +64,14 @@ export default async function JobDetailPage({ params }: { params: { slug: string
           <div className="lg:col-span-2 space-y-6">
             <div className="flex items-start gap-4">
               <div className="h-14 w-14 rounded-xl bg-secondary border flex items-center justify-center text-lg font-semibold shrink-0">
-                {job.corporate.companyName[0]}
+                {companyName[0]}
               </div>
               <div className="flex-1">
-                <h1 className="text-2xl font-semibold">{job.title}</h1>
-                <p className="text-muted-foreground mt-0.5">{job.corporate.companyName}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <h1 className="text-2xl font-semibold">{job.title}</h1>
+                  <ShareButton url={`/jobs/${job.slug}`} title={`${job.title} at ${companyName}`} />
+                </div>
+                <p className="text-muted-foreground mt-0.5">{companyName}</p>
                 <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-muted-foreground">
                   <Badge variant={TYPE_VARIANTS[job.employmentType] ?? "secondary"}>
                     {TYPE_LABELS[job.employmentType]}
@@ -121,35 +138,49 @@ export default async function JobDetailPage({ params }: { params: { slug: string
                 </div>
               ) : alreadyApplied ? (
                 <p className="text-sm text-muted-foreground">
-                  You've already applied for this role. The company will be in touch if shortlisted.
+                  You've already applied for this role. The poster will be in touch if shortlisted.
                 </p>
               ) : (
                 <ApplyJobForm jobId={job.id} />
               )}
             </div>
+
+            <CommentSection
+              targetType="JOB"
+              targetId={job.id}
+              comments={comments as any}
+              currentUserId={session?.user?.id}
+              heading="Questions"
+              emptyText="No questions yet. Ask the poster about the role, team, or process."
+            />
           </div>
 
           {/* Sidebar */}
           <div className="space-y-4">
             <div className="rounded-lg border p-4 space-y-3">
-              <h3 className="font-medium text-sm">About {job.corporate.companyName}</h3>
-              {job.corporate.industry && (
+              <h3 className="font-medium text-sm">About {companyName}</h3>
+              {job.corporate?.industry && (
                 <div>
                   <p className="text-xs text-muted-foreground">Industry</p>
                   <p className="text-sm">{job.corporate.industry}</p>
                 </div>
               )}
-              {job.corporate.country && (
+              {job.corporate?.country && (
                 <div>
                   <p className="text-xs text-muted-foreground">Location</p>
                   <p className="text-sm">{job.corporate.country}</p>
                 </div>
               )}
-              {job.corporate.website && (
+              {job.corporate?.website && (
                 <a href={job.corporate.website} target="_blank" rel="noopener noreferrer"
                   className="text-sm text-blue-600 hover:underline block">
                   Visit website ↗
                 </a>
+              )}
+              {!job.corporate && (
+                <p className="text-xs text-muted-foreground">
+                  Posted on behalf of {companyName} via GoBig.cc.
+                </p>
               )}
             </div>
           </div>

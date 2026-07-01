@@ -1,10 +1,13 @@
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { Navbar } from "@/components/layout/Navbar";
+import { CommentSection } from "@/components/shared/CommentSection";
+import { ShareButton } from "@/components/shared/ShareButton";
 import { Badge } from "@/components/ui/Card";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { timeAgo } from "@/lib/utils";
-import { ChevronLeft, BookOpen, Mic, TrendingUp, Star, Mail } from "lucide-react";
+import { BookOpen, ChevronLeft, Mail, Mic, Star, TrendingUp } from "lucide-react";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
 const TYPE_ICONS: Record<string, React.ElementType> = {
   ARTICLE: BookOpen, INTERVIEW: Mic, TREND_REPORT: TrendingUp,
@@ -20,6 +23,8 @@ const TYPE_VARIANTS: Record<string, any> = {
 };
 
 export default async function EditorialArticlePage({ params }: { params: { slug: string } }) {
+  const session = await auth();
+
   const article = await prisma.editorialArticle.findUnique({
     where: { slug: params.slug, status: "PUBLISHED" },
     include: { author: true },
@@ -32,6 +37,16 @@ export default async function EditorialArticlePage({ params }: { params: { slug:
     orderBy: { publishedAt: "desc" },
     take: 3,
     include: { author: true },
+  });
+
+  const comments = await prisma.comment.findMany({
+    where: { articleId: article.id, parentId: null },
+    include: {
+      author: { include: { designerProfile: true } },
+      replies: { include: { author: { include: { designerProfile: true } } } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 20,
   });
 
   const Icon = TYPE_ICONS[article.type] ?? BookOpen;
@@ -58,16 +73,19 @@ export default async function EditorialArticlePage({ params }: { params: { slug:
           {article.excerpt && (
             <p className="text-lg text-muted-foreground mt-3 leading-relaxed">{article.excerpt}</p>
           )}
-          <div className="flex items-center gap-3 mt-4 text-sm text-muted-foreground">
-            <div className="h-8 w-8 rounded-full bg-secondary border flex items-center justify-center text-xs font-medium">
-              {article.author.name?.[0]?.toUpperCase() ?? "G"}
+          <div className="flex items-center justify-between gap-3 mt-4">
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+              <div className="h-8 w-8 rounded-full bg-secondary border flex items-center justify-center text-xs font-medium">
+                {article.author.name?.[0]?.toUpperCase() ?? "G"}
+              </div>
+              <div>
+                <span className="font-medium text-foreground">{article.author.name ?? "GoBig Editorial"}</span>
+                {article.publishedAt && (
+                  <span> · {new Date(article.publishedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</span>
+                )}
+              </div>
             </div>
-            <div>
-              <span className="font-medium text-foreground">{article.author.name ?? "GoBig Editorial"}</span>
-              {article.publishedAt && (
-                <span> · {new Date(article.publishedAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</span>
-              )}
-            </div>
+            <ShareButton url={`/editorial/${article.slug}`} title={article.title} description={article.excerpt ?? undefined} />
           </div>
         </div>
 
@@ -93,6 +111,18 @@ export default async function EditorialArticlePage({ params }: { params: { slug:
             ))}
           </div>
         )}
+
+        {/* Comments */}
+        <div className="mt-10 pt-8 border-t">
+          <CommentSection
+            targetType="EDITORIAL"
+            targetId={article.id}
+            comments={comments as any}
+            currentUserId={session?.user?.id}
+            heading="Discussion"
+            emptyText="No comments yet. Share your thoughts on this piece."
+          />
+        </div>
 
         {/* Related */}
         {related.length > 0 && (

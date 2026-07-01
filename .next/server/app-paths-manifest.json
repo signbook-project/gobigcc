@@ -1,4 +1,8 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
+  "/api/admin/pending-counts/route": "app/api/admin/pending-counts/route.js",
+  "/jobs/[slug]/page": "app/jobs/[slug]/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/designs/page": "app/designs/page.js",
   "/page": "app/page.js"
 }

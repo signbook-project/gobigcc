@@ -1,8 +1,8 @@
-import Link from "next/link";
-import { Heart, GitFork, Eye, Download } from "lucide-react";
+import { Badge } from "@/components/ui/Card";
 import { cn, formatNumber } from "@/lib/utils";
 import type { DesignCard as DesignCardType } from "@/types";
-import { Badge } from "@/components/ui/Card";
+import { Eye, GitFork, Heart } from "lucide-react";
+import Link from "next/link";
 
 const LICENSE_COLORS: Record<string, any> = {
   OPEN_SOURCE: "success",
@@ -71,7 +71,7 @@ export function DesignCard({ design, className }: Props) {
           </span>
           <span className="flex items-center gap-1">
             <GitFork className="h-3 w-3" />
-            {formatNumber(design._count.forks ?? 0)}
+            {formatNumber(design.forkCount ?? 0)}
           </span>
           <span className="flex items-center gap-1 ml-auto">
             <Eye className="h-3 w-3" />

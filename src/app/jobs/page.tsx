@@ -1,10 +1,10 @@
-import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { Navbar } from "@/components/layout/Navbar";
 import { Badge } from "@/components/ui/Card";
-import { timeAgo } from "@/lib/utils";
 import { auth } from "@/lib/auth";
-import { MapPin, Clock, ArrowRight, Briefcase } from "lucide-react";
+import { prisma } from "@/lib/prisma";
+import { timeAgo } from "@/lib/utils";
+import { ArrowRight, Briefcase, Clock, MapPin } from "lucide-react";
+import Link from "next/link";
 
 const JOB_TYPES = [
   { value: "", label: "All" },
@@ -72,8 +72,17 @@ export default async function JobsPage({
               Full-time, freelance, and internship opportunities for designers.
             </p>
           </div>
-          {session?.user && (session.user as any).role === "CORPORATE" && (
-            <Link href="/jobs/new" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+          {session?.user ? (
+            <div className="flex gap-2">
+              <Link href="/jobs/mine" className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-secondary transition-colors">
+                My postings
+              </Link>
+              <Link href="/jobs/new" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+                Post a job
+              </Link>
+            </div>
+          ) : (
+            <Link href="/login?redirect=/jobs/new" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
               Post a job
             </Link>
           )}
@@ -120,7 +129,9 @@ export default async function JobsPage({
           <div className="py-24 text-center text-muted-foreground">No jobs found</div>
         ) : (
           <div className="flex flex-col gap-3">
-            {jobs.map((job) => (
+            {jobs.map((job) => {
+              const companyName = job.corporate?.companyName ?? job.companyNameOverride ?? "Company";
+              return (
               <Link
                 key={job.id}
                 href={`/jobs/${job.slug}`}
@@ -128,13 +139,13 @@ export default async function JobsPage({
               >
                 {/* Company logo */}
                 <div className="h-11 w-11 rounded-lg bg-secondary border flex items-center justify-center text-sm font-semibold shrink-0">
-                  {job.corporate.companyName[0]}
+                  {companyName[0]}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2 flex-wrap">
                     <div>
                       <p className="font-medium">{job.title}</p>
-                      <p className="text-sm text-muted-foreground mt-0.5">{job.corporate.companyName}</p>
+                      <p className="text-sm text-muted-foreground mt-0.5">{companyName}</p>
                     </div>
                     <Badge variant={TYPE_VARIANTS[job.employmentType] ?? "secondary"}>
                       {TYPE_LABELS[job.employmentType] ?? job.employmentType}
@@ -166,7 +177,8 @@ export default async function JobsPage({
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
               </Link>
-            ))}
+            );
+            })}
           </div>
         )}
 

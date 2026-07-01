@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { notifyDesignLiked } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await auth();
@@ -11,10 +12,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   });
   if (existing) return NextResponse.json({ error: "Already liked" }, { status: 409 });
 
-  await prisma.$transaction([
+  const [, design] = await prisma.$transaction([
     prisma.designLike.create({ data: { designId: params.id, userId: session.user.id } }),
     prisma.design.update({ where: { id: params.id }, data: { likeCount: { increment: 1 } } }),
   ]);
+
+  if (design.authorId !== session.user.id) {
+    const liker = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      include: { designerProfile: true },
+    });
+    const likerName = liker?.designerProfile?.alias ?? liker?.name ?? "Someone";
+    notifyDesignLiked(design.authorId, likerName, design.title, design.slug).catch(console.error);
+  }
 
   return NextResponse.json({ success: true });
 }
